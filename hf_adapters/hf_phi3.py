@@ -52,6 +52,7 @@ from hf_adapters.hf_common import (
     rope_dim_permutation,
     run_lm_head,
     split_fused_linear,
+    to_default_device_layout,
 )
 
 # ---------------------------------------------------------------------------
@@ -166,7 +167,7 @@ def _run_backbone_forward(
 ):
     """Phi-3 backbone: embedding, blocks, norm."""
     backbone = get_backbone(model)
-    h = backbone.embed_tokens(input_ids)
+    h = to_default_device_layout(backbone.embed_tokens(input_ids))
     selected_freqs = model._spyre_rope(h, position_ids)
 
     for i, compiled_block in enumerate(model._spyre_compiled_blocks):

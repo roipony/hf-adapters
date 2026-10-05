@@ -37,6 +37,7 @@ from hf_adapters.hf_common import (
     prepare_standard_gqa_blocks,
     run_lm_head,
     text_config,
+    to_default_device_layout,
 )
 
 
@@ -52,7 +53,7 @@ def _run_backbone_forward(
     """Granite 3.3 backbone: embedding * multiplier, blocks, norm."""
     backbone = get_backbone(model)
     h = backbone.embed_tokens(input_ids)
-    h = h * backbone.embedding_multiplier
+    h = to_default_device_layout(h * backbone.embedding_multiplier)
 
     selected_freqs = model._spyre_rope(h, position_ids)
 
