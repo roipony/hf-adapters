@@ -325,12 +325,26 @@ def get_backbone(model):
     return getattr(inner, "language_model", inner)
 
 
-def embed_text_tokens(model, input_ids):
-    """Embed text token ids using the model backbone's embedding policy."""
-    backbone = get_backbone(model)
+def embed_text_tokens(model, input_ids, backbone=None):
+    """Embed text token ids. All adapters use this for their token embedding.
+
+    Moves ``input_ids`` to the embedding's device, looks them up in
+    ``embed_tokens``, and multiplies by ``embedding_multiplier`` when the
+    backbone has one (Granite). Then copies the result into the default Spyre
+    layout (see ``to_default_device_layout``), so layer 0 gets its input in the
+    same layout as the other layers.
+
+    ``backbone`` defaults to ``get_backbone(model)``. Pass it for models that
+    keep ``embed_tokens`` somewhere else (OPT keeps it on ``decoder``).
+    """
+    if backbone is None:
+        backbone = get_backbone(model)
     input_ids = input_ids.to(backbone.embed_tokens.weight.device)
     hidden_states = backbone.embed_tokens(input_ids)
-    return hidden_states * getattr(backbone, "embedding_multiplier", 1.0)
+    multiplier = getattr(backbone, "embedding_multiplier", None)
+    if multiplier is not None:
+        hidden_states = hidden_states * multiplier
+    return to_default_device_layout(hidden_states)
 
 
 def text_config(config):
@@ -3270,8 +3284,7 @@ def standard_gqa_backbone_forward(
     Returns ``last_hidden_state`` (no ``lm_head``). Used directly by embedding
     callers; wrapped by ``standard_gqa_forward`` for causal-LM callers.
     """
-    backbone = get_backbone(model)
-    h = to_default_device_layout(backbone.embed_tokens(input_ids))
+    h = embed_text_tokens(model, input_ids)
 
     selected_freqs = model._spyre_rope(h, position_ids)
 
